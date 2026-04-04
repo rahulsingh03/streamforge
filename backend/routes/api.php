@@ -20,3 +20,5 @@ Route::middleware("auth:sanctum")->group(function () {
         Route::get("/tempurl/{video}", [VideoController::class, "getTempUrl"]);
     });
 });
+
+Route::post("videos/internal/progress/{id}", [VideoController::class, "updateVideoProgress"]);

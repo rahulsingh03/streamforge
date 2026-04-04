@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Services\KafkaProducer;
 use Illuminate\Support\Facades\Storage;
+use App\Events\VideoProgressUpdated;
+use Illuminate\Support\Facades\Validator;
 
 class VideoController extends Controller
 {
@@ -104,6 +106,38 @@ class VideoController extends Controller
 
         return response()->json([
             "upload_url" => $uploadUrl,
+        ]);
+    }
+
+    public function updateVideoProgress(Request $request, $id){
+        $validator = Validator::make($request->all(), [
+            "progress_percent" => "required|integer|min:0|max:100",
+            "progress_message" => "required|string",
+        ]);
+
+
+        if($validator->fails()){
+            return response()->json([
+                "message" => "Validation failed",
+                "errors" => $validator->errors()
+            ], 422);
+        }
+
+        $video = Video::findOrFail($id);
+
+        $video->progress_percent = $request->progress_percent;
+        $video->progress_message = $request->progress_message;
+        $video->save();
+
+        event(new VideoProgressUpdated([
+            "video_id" => $video->id,
+            "progress_percent" => $video->progress_percent,
+            "progress_message" => $video->progress_message,
+        ]));
+
+        return response()->json([
+            "message" => "Video progress updated",
+            "video" => $video
         ]);
     }
 }

@@ -3,13 +3,15 @@ import os
 import subprocess
 import pymysql
 import boto3
+import requests
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
 
 load_dotenv()
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER")
-KAFKA_TOPIC = os.getenv("KAFKA_TOPIC")
+KAFKA_UPLOAD_TOPIC = os.getenv("KAFKA_UPLOAD_TOPIC")
+KAFKA_PROGRESS_TOPIC = os.getenv("KAFKA_PROGRESS_TOPIC")
 
 AWS_BUCKET = os.getenv("AWS_BUCKET")
 AWS_REGION = os.getenv("AWS_REGION")
@@ -20,6 +22,17 @@ s3 = boto3.client(
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
 )
+
+def notify_backend(video_id, percentage, message):
+    baseUrl = os.getenv("BASE_API_URL")
+    print(f'baseUrl {baseUrl}')
+    requests.post(
+        f"{baseUrl}api/videos/internal/progress/{video_id}",
+        json={
+            "progress_percent": percentage,
+            "progress_message": message
+        }
+    )
 
 def mysql_connection():
     return pymysql.connect(
@@ -100,19 +113,22 @@ def process_video_event(event):
         update_video_status(video_id, "processing")
 
         # Download video
+        notify_backend(video_id, 10, "Downloading from S3")
         download_from_s3(s3_key, local_video_path)
 
         # Extract metadata
+        notify_backend(video_id, 40, "Extracting metadata")
         duration, resolution = extract_metadata(local_video_path)
 
         # Generate thumbnail
+        notify_backend(video_id, 70, "Generating thumbnail")
         generate_thumbnail(local_video_path, local_thumb_path)
 
         # Upload thumbnail
+        notify_backend(video_id, 100, "Processing completed")
         thumb_s3_key = f"videos/thumbnails/{video_id}/thumb.jpg"
         upload_to_s3(local_thumb_path, thumb_s3_key)
 
-        # Update DB
         update_video_status(
             video_id,
             "completed",
@@ -125,23 +141,28 @@ def process_video_event(event):
 
     except Exception as e:
         update_video_status(video_id, "failed", error=str(e))
+        notify_backend(video_id, 0, str(e))
         print(f"Video {video_id} failed: {str(e)}")
 
 def main():
     consumer = KafkaConsumer(
-        KAFKA_TOPIC,
+        KAFKA_UPLOAD_TOPIC,
         bootstrap_servers=KAFKA_BROKER,
         auto_offset_reset="earliest",
-        enable_auto_commit=True,
+        enable_auto_commit=False,
+        group_id="streamforge-worker",
+        session_timeout_ms=30000,
+        max_poll_interval_ms=600000,
         value_deserializer=lambda x: json.loads(x.decode("utf-8"))
     )
 
-    print(f"Worker listening on Kafka topic: {KAFKA_TOPIC}")
+    print(f"Worker listening on Kafka topic: {KAFKA_UPLOAD_TOPIC}")
 
     for msg in consumer:
         event = msg.value
         if event.get("event") == "video.uploaded":
             process_video_event(event)
+            consumer.commit()
 
 if __name__ == "__main__":
     main()
