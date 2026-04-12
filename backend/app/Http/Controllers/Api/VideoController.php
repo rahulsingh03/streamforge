@@ -115,7 +115,6 @@ class VideoController extends Controller
             "progress_message" => "required|string",
         ]);
 
-
         if($validator->fails()){
             return response()->json([
                 "message" => "Validation failed",
@@ -128,7 +127,7 @@ class VideoController extends Controller
         $video->progress_percent = $request->progress_percent;
         $video->progress_message = $request->progress_message;
         $video->save();
-
+             
         event(new VideoProgressUpdated([
             "video_id" => $video->id,
             "progress_percent" => $video->progress_percent,

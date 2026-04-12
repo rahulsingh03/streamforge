@@ -6,6 +6,7 @@ import boto3
 import requests
 from kafka import KafkaConsumer
 from dotenv import load_dotenv
+from kafka.errors import CommitFailedError, IllegalStateError
 
 load_dotenv()
 
@@ -63,6 +64,21 @@ def update_video_status(video_id, status, thumbnail_path=None, duration=None, re
     finally:
         conn.close()
 
+def fetch_video_status(video_id):
+    conn = mysql_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT status
+                FROM videos
+                WHERE id = %s
+            """
+            cursor.execute(sql, (video_id))
+            result = cursor.fetchone()
+            return result["status"]
+    finally:
+        conn.close()
+
 def download_from_s3(s3_key, local_path):
     s3.download_file(AWS_BUCKET, s3_key, local_path)
 
@@ -103,6 +119,11 @@ def generate_thumbnail(video_path, thumbnail_path):
 def process_video_event(event):
     video_id = event["video_id"]
     s3_key = event["s3_key"]
+    status = fetch_video_status(video_id)
+
+    if status == "completed":
+        print(f"Video {video_id} is already completed.")
+        return
 
     print(f"Processing video_id={video_id}, s3_key={s3_key}")
 
@@ -161,8 +182,12 @@ def main():
     for msg in consumer:
         event = msg.value
         if event.get("event") == "video.uploaded":
-            process_video_event(event)
-            consumer.commit()
+            try:
+                process_video_event(event)
+                consumer.commit()
+            except Exception as e:
+                print("Processing failed, not committing offset:", e)
+
 
 if __name__ == "__main__":
     main()
