@@ -21,6 +21,6 @@ class VideoProgressListerner
      */
     public function handle(object $event): void
     {
-        Log::info('Video progress updated', $event->data);
+        Log::info('Video progress updated ' . json_encode($event));
     }
 }

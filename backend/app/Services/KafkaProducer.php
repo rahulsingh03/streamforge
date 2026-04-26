@@ -18,6 +18,8 @@ class KafkaProducer
 
     public function publish(string $topic, array $payload): void
     {
-        $this->producer->send($topic, json_encode($payload));
+        $key = (string) ($payload['video_id'] ?? uniqid("kafka-partition-key"));
+
+        $this->producer->send($topic, json_encode($payload), $key);
     }
 }

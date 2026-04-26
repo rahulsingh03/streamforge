@@ -11,7 +11,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class VideoProgressUpdated implements ShouldBroadcast
+class VideoProgressUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -35,7 +35,7 @@ class VideoProgressUpdated implements ShouldBroadcast
         return new Channel("video." . $this->data["video_id"]);
     }
 
-    public function broadCastAs(): string 
+    public function broadcastAs(): string
     {
 
         return "progress.updated";

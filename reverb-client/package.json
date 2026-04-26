@@ -1,0 +1,20 @@
+{
+  "name": "reverb-client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "listen.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node listen.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "laravel-echo": "^2.3.4",
+    "pusher-js": "^8.5.0",
+    "ws": "^8.20.0"
+  }
+}
